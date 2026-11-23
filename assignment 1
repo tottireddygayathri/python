@@ -1,1 +1,43 @@
 
+DISCOUNT = 2.0
+
+class Loan:
+    def __init__(self, principal, rate, time):
+        if principal < 0 or rate < 0 or time < 0:
+            raise ValueError("Invalid loan details")
+
+        self.p = principal
+        self.r = rate
+        self.t = time
+
+    def calculate_interest(self):
+        return (self.p * self.r * self.t) / 100
+
+    def calculate_amount(self):
+        return self.p + self.calculate_interest()
+
+    def calculate_discount(self):
+        return self.calculate_interest() * DISCOUNT / 100
+
+    def calculate_final_amount(self):
+        return self.calculate_amount() - self.calculate_discount()
+
+
+def main():
+    try:
+        p, r, t = map(int, input().split())
+
+        loan = Loan(p, r, t)
+
+        print(f"{loan.calculate_interest():.2f}")
+        print(f"{loan.calculate_amount():.2f}")
+        print(f"{loan.calculate_discount():.2f}")
+        print(f"{loan.calculate_final_amount():.2f}")
+
+    except ValueError:
+        print("Error: Invalid loan details")
+
+
+if __name__ == "__main__":
+    main()
+

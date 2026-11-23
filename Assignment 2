@@ -1,1 +1,172 @@
 
+# Temple Steps Problem - Q6 and Q7
+
+calls = 0
+
+# Normal Recursion
+def ways_naive(n):
+    global calls
+    calls += 1
+
+    if n <= 1:
+        return 1
+
+    return ways_naive(n-1) + ways_naive(n-2)
+
+
+# Memoization
+def ways_memo(n, cache=None):
+    global calls
+
+    if cache is None:
+        cache = {}
+
+    calls += 1
+
+    if n <= 1:
+        return 1
+
+    if n not in cache:
+        cache[n] = ways_memo(n-1, cache) + ways_memo(n-2, cache)
+
+    return cache[n]
+
+
+# Iterative Method
+def ways_iterative(n):
+    a, b = 1, 1
+
+    for i in range(2, n+1):
+        a, b = b, a+b
+
+    return b
+
+
+# Q6 (a): Call Tree
+def call_tree(n, depth=0):
+    print("  " * depth + "ways(" + str(n) + ")")
+
+    if n <= 1:
+        return
+
+    call_tree(n-1, depth+1)
+    call_tree(n-2, depth+1)
+
+
+print("\nQ6 (a): CALL TREE")
+call_tree(5)
+
+
+# Q6 (b): Correctness Check
+print("\nQ6 (b): CORRECTNESS CHECK")
+print("n   Naive   Memo   Loop")
+
+for n in range(1, 7):
+    calls = 0
+    x = ways_naive(n)
+    y = ways_memo(n)
+    z = ways_iterative(n)
+
+    print(n, x, y, z)
+
+
+# Q6 (c): Output for n = 25
+print("\nQ6 (c): OUTPUT FOR N=25")
+
+calls = 0
+x = ways_naive(25)
+print("Naive:", x, "Calls:", calls)
+
+calls = 0
+y = ways_memo(25)
+print("Memo:", y, "Calls:", calls)
+
+
+# Q6 (d): Growth Investigation
+print("\nQ6 (d): GROWTH INVESTIGATION")
+print("n   Naive Calls   Memo Calls")
+
+for n in (10, 20, 25, 30):
+    calls = 0
+    ways_naive(n)
+    nc = calls
+
+    calls = 0
+    ways_memo(n, {})
+    mc = calls
+
+    print(n, nc, mc)
+
+
+# Q6 (e): Large Input
+print("\nQ6 (e): LARGE INPUT")
+
+result = ways_iterative(1000)
+
+print("First 20 digits:", str(result)[:20])
+print("Total digits:", len(str(result)))
+print("Iterative method completed successfully.")
+
+
+# Q6 (f): Complexity
+print("\nQ6 (f): COMPLEXITY")
+
+print("Naive Recursion: O(1.618^n) Time, O(n) Space")
+print("Memoization: O(n) Time, O(n) Space")
+print("Iteration: O(n) Time, O(1) Space")
+
+
+# Q7 (A): Diagnosis
+print("\nQ7 (A): DIAGNOSIS")
+
+calls = 0
+ways_naive(20)
+print("Total calls:", calls)
+print("Problem: Repeated calculations.")
+
+
+# Q7 (B): Objective
+print("\nQ7 (B): DESIGN OBJECTIVE")
+
+print("Reduce repeated calculations.")
+print("Improve execution speed.")
+print("Maintain correct output.")
+
+
+# Q7 (C): Revised Solution
+print("\nQ7 (C): REVISED SOLUTION")
+
+print("Use iterative method.")
+print("Time Complexity: O(n)")
+print("Space Complexity: O(1)")
+
+
+# Q7 (D): Prediction
+print("\nQ7 (D): PREDICTION")
+
+print("For n=30:")
+print("Naive calls: 2692537")
+print("Memo calls: 31")
+
+
+# Q7 (E): Validation
+print("\nQ7 (E): VALIDATION")
+
+print("n   Naive   Memo   Loop   Same")
+
+for n in (5, 10, 20, 25, 30):
+    x = ways_naive(n)
+    y = ways_memo(n, {})
+    z = ways_iterative(n)
+
+    print(n, x, y, z, x == y == z)
+
+
+# Q7 (F): Final Design
+print("\nQ7 (F): FINAL DESIGN")
+
+print("Repeated calculations reduced.")
+print("Execution speed improved.")
+print("All methods produce the same result.")
+print("Iterative method is best for large inputs.")
+

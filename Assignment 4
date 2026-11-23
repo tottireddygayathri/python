@@ -1,1 +1,169 @@
 
+import os
+import re
+
+# Sample department data
+department_data = {
+    "CSE": [
+        "CS001,Arun Kumar,CSE,arun@college.edu,Dance;Singing",
+        "CS002,Divya Nair,CSE,divya@college.edu,Drama",
+        "CS001,Arun Kumar,CSE,arun@college.edu,Quiz"
+    ],
+    "ECE": [
+        "EC001,Meena Iyer,ECE,meena@college.edu,Singing;Quiz",
+        "EC002,Ravi Sharma,ECE,ravi.college.edu,Dance",
+        "EC003,Kiran Rao,ECE"
+    ],
+    "MECH": [
+        "ME001,Suresh Das,MECH,suresh@college.edu,Drama;Dance"
+    ],
+    "CIVIL": [
+        "CV001,Latha Menon,CIVIL,latha@college.edu,Quiz",
+        "CV002,Anita S,CIVIL,anita@@college.edu,Singing"
+    ]
+}
+
+# Validate email
+def valid_email(email):
+    pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    return re.match(pattern, email) is not None
+
+
+# Process student records
+def process_students(data):
+    students = []
+    seen = set()
+    errors = []
+
+    for department, lines in data.items():
+        for line_no, line in enumerate(lines, 1):
+
+            fields = line.split(",")
+
+            if len(fields) != 5:
+                errors.append(
+                    department + ": Invalid record format"
+                )
+                continue
+
+            regno, name, dept, email, events = [
+                item.strip() for item in fields
+            ]
+
+            if not regno or not name or not dept:
+                errors.append(department + ": Missing student details")
+                continue
+
+            if not valid_email(email):
+                errors.append(department + ": Invalid email - " + email)
+                continue
+
+            if not events.strip():
+                errors.append(department + ": No event selected")
+                continue
+
+            regno = regno.upper()
+
+            if regno in seen:
+                errors.append(department + ": Duplicate registration - " + regno)
+                continue
+
+            seen.add(regno)
+
+            students.append({
+                "regno": regno,
+                "name": name.title(),
+                "department": dept.upper(),
+                "email": email.lower(),
+                "events": [e.strip().title() for e in events.split(";") if e.strip()]
+            })
+
+    return students, errors
+
+
+# Create event-wise student lists
+def event_details(students):
+    events = {}
+
+    for student in students:
+        for event in student["events"]:
+            if event not in events:
+                events[event] = []
+
+            events[event].append(student)
+
+    return events
+
+
+# Save output files
+def save_files(students, events, errors):
+    os.makedirs("fest_output", exist_ok=True)
+
+    with open("fest_output/master.csv", "w") as file:
+        file.write("Register Number,Name,Department,Email,Events\n")
+
+        for s in students:
+            file.write(
+                f'{s["regno"]},{s["name"]},{s["department"]},'
+                f'{s["email"]},{";".join(s["events"])}\n'
+            )
+
+    for event, people in events.items():
+        filename = re.sub(r"[^a-zA-Z0-9]+", "_", event.lower())
+
+        with open("fest_output/" + filename + ".txt", "w") as file:
+            file.write("Participants for " + event + "\n")
+            file.write("-----------------------------\n")
+
+            for person in people:
+                file.write(
+                    person["regno"] + " - " + person["name"] + "\n"
+                )
+
+    with open("fest_output/errors.log", "w") as file:
+        for error in errors:
+            file.write(error + "\n")
+
+
+# Display summary
+def display_summary(students, events, errors):
+    print("\nCOLLEGE FEST REGISTRATION SYSTEM")
+    print("--------------------------------")
+
+    print("Total valid students:", len(students))
+    print("Total events:", len(events))
+    print("Total errors:", len(errors))
+
+    print("\nDEPARTMENT-WISE DETAILS")
+
+    departments = {}
+
+    for student in students:
+        dept = student["department"]
+        departments[dept] = departments.get(dept, 0) + 1
+
+    for dept, count in sorted(departments.items()):
+        print(dept, ":", count)
+
+    print("\nEVENT-WISE PARTICIPANTS")
+
+    for event, people in sorted(events.items()):
+        print(event, ":", len(people), "students")
+
+    print("\nERROR DETAILS")
+
+    for error in errors:
+        print("-", error)
+
+    print("\nOutput files saved in fest_output folder.")
+
+
+# Main program
+students, errors = process_students(department_data)
+
+events = event_details(students)
+
+save_files(students, events, errors)
+
+display_summary(students, events, errors)
+

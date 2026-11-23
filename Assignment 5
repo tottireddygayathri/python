@@ -1,1 +1,506 @@
 
+import re
+import time
+import random
+import sqlite3
+from collections import Counter
+from itertools import islice
+
+# ------------------------------------------
+# 1. SENTIMENT WORD LISTS
+# ------------------------------------------
+
+POSITIVE = {
+    "good", "great", "excellent", "clean", "helpful",
+    "fast", "improved", "happy", "polite", "smooth",
+    "reliable", "safe", "patient", "better", "thank",
+    "thanks", "well", "short"
+}
+
+NEGATIVE = {
+    "bad", "dirty", "slow", "broken", "rude", "late",
+    "smoke", "delay", "delays", "crowded", "wrong",
+    "failed", "fails", "cold", "stink", "stinks",
+    "ignored", "wet", "hard", "refuse", "extra", "garbage"
+}
+
+NEGATORS = {
+    "not", "never", "no", "isn't", "wasn't",
+    "aren't", "don't", "doesn't", "didn't"
+}
+
+STOPWORDS = {
+    "the", "is", "a", "an", "and", "or", "to",
+    "of", "in", "on", "was", "were", "are",
+    "for", "with", "from", "it", "this", "that",
+    "my", "we", "our", "they", "he", "she"
+}
+
+
+# ------------------------------------------
+# 2. TEXT CLEANING
+# ------------------------------------------
+
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r"[^a-z\s']", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+# ------------------------------------------
+# 3. SENTIMENT ANALYSIS
+# ------------------------------------------
+
+def _score_words(text):
+    words = clean_text(text).split()
+    score = 0
+
+    for i, word in enumerate(words):
+
+        if word in POSITIVE:
+            value = 1
+        elif word in NEGATIVE:
+            value = -1
+        else:
+            value = 0
+
+        if i > 0 and words[i - 1] in NEGATORS:
+            value = -value
+
+        score += value
+
+    return score
+
+
+def score(text):
+    value = _score_words(text)
+
+    if value > 0:
+        return "positive"
+    elif value < 0:
+        return "negative"
+    else:
+        return "neutral"
+
+
+def score_regex(text):
+    text = clean_text(text)
+
+    positive_count = sum(
+        len(re.findall(r"\b" + word + r"\b", text))
+        for word in POSITIVE
+    )
+
+    negative_count = sum(
+        len(re.findall(r"\b" + word + r"\b", text))
+        for word in NEGATIVE
+    )
+
+    value = positive_count - negative_count
+
+    if value > 0:
+        return "positive"
+    elif value < 0:
+        return "negative"
+    else:
+        return "neutral"
+
+
+# ------------------------------------------
+# 4. COMPLAINT DATASET
+# ------------------------------------------
+
+complaints = [
+    "The bus service was good and fast",
+    "The bus was late and very slow",
+    "The driver was polite and helpful",
+    "The bus was dirty and crowded",
+    "The roads are clean and the bus was fast",
+    "Smoke from the factory, air is bad",
+    "The staff were not helpful",
+    "Not bad, service improved",
+    "The bus arrived on time",
+    "The driver was rude",
+    "The bus was comfortable and smooth",
+    "The seats were broken",
+    "The service was excellent",
+    "The bus was overcrowded",
+    "The ticket counter staff were helpful",
+    "The bus was delayed again",
+    "The journey was safe",
+    "The bus was dirty and slow",
+    "The staff ignored my complaint",
+    "The bus service is reliable",
+    "The bus was late today",
+    "The driver was patient",
+    "The service was bad",
+    "The bus was clean and comfortable",
+    "The bus stopped suddenly",
+    "The staff were polite",
+    "The bus was broken",
+    "The service improved recently",
+    "The bus was very crowded",
+    "The driver was helpful",
+    "The bus arrived late",
+    "The service was great",
+    "The bus was not good",
+    "The seats were wet",
+    "The journey was smooth",
+    "The driver was rude and careless",
+    "The bus was fast",
+    "The service was poor",
+    "The bus was safe",
+    "The staff refused to help",
+    "The bus was clean",
+    "The bus was slow",
+    "The service was better",
+    "The bus was not bad",
+    "The driver was excellent",
+    "The bus was dirty",
+    "The staff were not polite",
+    "The journey was comfortable",
+    "The bus was late and crowded",
+    "The service was reliable",
+    "The bus was broken and dirty",
+    "The driver was kind",
+    "The service was not good",
+    "The bus was fast and clean",
+    "The staff were helpful",
+    "The bus was delayed",
+    "The journey was safe and smooth",
+    "The service was terrible"
+]
+
+
+# ------------------------------------------
+# 5. FREQUENCY-BASED SUMMARISATION
+# ------------------------------------------
+
+def frequency_summary(text, sentence_count=2):
+
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+
+    words = clean_text(text).split()
+
+    useful_words = [
+        word for word in words
+        if word not in STOPWORDS
+    ]
+
+    frequency = Counter(useful_words)
+
+    sentence_scores = {}
+
+    for sentence in sentences:
+        sentence_words = clean_text(sentence).split()
+
+        sentence_scores[sentence] = sum(
+            frequency[word]
+            for word in sentence_words
+        )
+
+    selected = sorted(
+        sentence_scores,
+        key=sentence_scores.get,
+        reverse=True
+    )
+
+    return " ".join(selected[:sentence_count])
+
+
+# ------------------------------------------
+# 6. FIRST SENTENCE SUMMARISATION
+# ------------------------------------------
+
+def first_k_summary(text, sentence_count=2):
+
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+
+    return " ".join(sentences[:sentence_count])
+
+
+# ------------------------------------------
+# 7. SUMMARY COVERAGE
+# ------------------------------------------
+
+def summary_coverage(original, summary):
+
+    original_words = set(clean_text(original).split())
+    summary_words = set(clean_text(summary).split())
+
+    if not original_words:
+        return 0
+
+    coverage = len(
+        original_words.intersection(summary_words)
+    ) / len(original_words)
+
+    return round(coverage * 100, 2)
+
+
+# ------------------------------------------
+# 8. SENTIMENT ANALYSIS DEMO
+# ------------------------------------------
+
+def sentiment_demo():
+
+    print("\n===== SENTIMENT ANALYSIS =====")
+
+    test_sentences = [
+        "Roads are clean and the bus was fast.",
+        "Smoke from the factory, air is bad.",
+        "The staff were not helpful.",
+        "Not bad, service improved."
+    ]
+
+    for sentence in test_sentences:
+
+        result = score(sentence)
+
+        print("\nComplaint:", sentence)
+        print("Sentiment:", result)
+
+
+# ------------------------------------------
+# 9. DATASET ANALYSIS
+# ------------------------------------------
+
+def dataset_analysis():
+
+    print("\n===== COMPLAINT DATASET ANALYSIS =====")
+
+    results = []
+
+    for complaint in complaints:
+
+        sentiment = score(complaint)
+
+        results.append(sentiment)
+
+        print(
+            "Complaint:", complaint,
+            "| Sentiment:", sentiment
+        )
+
+    count = Counter(results)
+
+    print("\nSentiment Summary")
+
+    print("Positive:", count["positive"])
+    print("Negative:", count["negative"])
+    print("Neutral:", count["neutral"])
+
+    return results
+
+
+# ------------------------------------------
+# 10. SCORER COMPARISON
+# ------------------------------------------
+
+def scorer_comparison():
+
+    print("\n===== SCORER COMPARISON =====")
+
+    agreement = 0
+
+    for complaint in complaints:
+
+        result1 = score(complaint)
+        result2 = score_regex(complaint)
+
+        if result1 == result2:
+            agreement += 1
+
+    percentage = agreement / len(complaints) * 100
+
+    print("Total complaints:", len(complaints))
+    print("Matching results:", agreement)
+    print("Agreement percentage:", round(percentage, 2), "%")
+
+
+# ------------------------------------------
+# 11. SUMMARISATION DEMO
+# ------------------------------------------
+
+def summarisation_demo():
+
+    print("\n===== SUMMARISATION =====")
+
+    text = (
+        "The bus service is good and reliable. "
+        "However, buses are often late and crowded. "
+        "Passengers complained about dirty seats. "
+        "The transport department should improve service. "
+        "The staff are helpful and polite."
+    )
+
+    print("\nOriginal Text:")
+    print(text)
+
+    summary1 = frequency_summary(text, 2)
+
+    summary2 = first_k_summary(text, 2)
+
+    print("\nFrequency Summary:")
+    print(summary1)
+
+    print("\nFirst Two Sentences Summary:")
+    print(summary2)
+
+    print(
+        "\nSummary Coverage:",
+        summary_coverage(text, summary1),
+        "%"
+    )
+
+
+# ------------------------------------------
+# 12. DATABASE CREATION
+# ------------------------------------------
+
+def build_database():
+
+    connection = sqlite3.connect(":memory:")
+
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        CREATE TABLE complaints (
+            id INTEGER PRIMARY KEY,
+            complaint TEXT,
+            sentiment TEXT,
+            department TEXT
+        )
+    """)
+
+    departments = [
+        "Bus Department",
+        "Road Department",
+        "Traffic Department"
+    ]
+
+    for i, complaint in enumerate(complaints):
+
+        sentiment = score(complaint)
+
+        department = departments[i % len(departments)]
+
+        cursor.execute("""
+            INSERT INTO complaints
+            (complaint, sentiment, department)
+            VALUES (?, ?, ?)
+        """, (complaint, sentiment, department))
+
+    connection.commit()
+
+    return connection
+
+
+# ------------------------------------------
+# 13. DATABASE QUERY
+# ------------------------------------------
+
+def database_demo():
+
+    print("\n===== DATABASE ANALYSIS =====")
+
+    connection = build_database()
+
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT sentiment, COUNT(*)
+        FROM complaints
+        GROUP BY sentiment
+    """)
+
+    rows = cursor.fetchall()
+
+    print("\nSentiment Counts:")
+
+    for row in rows:
+        print(row[0], ":", row[1])
+
+    cursor.execute("""
+        SELECT complaint
+        FROM complaints
+        WHERE sentiment = 'negative'
+    """)
+
+    print("\nNegative Complaints:")
+
+    for row in cursor.fetchall():
+        print("-", row[0])
+
+    connection.close()
+
+
+# ------------------------------------------
+# 14. PERFORMANCE MEASUREMENT
+# ------------------------------------------
+
+def performance_test():
+
+    print("\n===== PERFORMANCE TEST =====")
+
+    start = time.time()
+
+    for complaint in complaints:
+        score(complaint)
+
+    end = time.time()
+
+    print(
+        "Sentiment processing time:",
+        round(end - start, 6),
+        "seconds"
+    )
+
+    start = time.time()
+
+    for complaint in complaints:
+        frequency_summary(complaint)
+
+    end = time.time()
+
+    print(
+        "Summarisation processing time:",
+        round(end - start, 6),
+        "seconds"
+    )
+
+
+# ------------------------------------------
+# 15. MAIN FUNCTION
+# ------------------------------------------
+
+def main():
+
+    print("======================================")
+    print(" PUBLIC TRANSPORT COMPLAINT ANALYSIS")
+    print("======================================")
+
+    sentiment_demo()
+
+    dataset_analysis()
+
+    scorer_comparison()
+
+    summarisation_demo()
+
+    database_demo()
+
+    performance_test()
+
+    print("\n======================================")
+    print(" PROGRAM EXECUTED SUCCESSFULLY")
+    print("======================================")
+
+
+# ------------------------------------------
+# 16. PROGRAM START
+# ------------------------------------------
+
+if __name__ == "__main__":
+    main()
